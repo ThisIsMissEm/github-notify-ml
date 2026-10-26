@@ -3,7 +3,7 @@
 #
 # Usage (from the repo root, so instance/config.json resolves):
 #   set -a; source instance/.env; set +a
-#   python test-email.py you@example.com
+#   python send-test-email.py you@example.com
 import logging
 import sys
 

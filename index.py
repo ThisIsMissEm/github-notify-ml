@@ -834,6 +834,18 @@ def _sendMail(config, from_addr, to_addr, subject, message):
     logger.info("Sent %r from %s to %s", subject, from_addr, to_addr)
     return {"to": to_addr, "subject": subject}
 
+def sendTestEmail(config, to_addr):
+    # same sender and SMTP path as digests, to check delivery end-to-end
+    from_addr = config.get("email", {}).get("from", config["EMAIL_FROM"])
+    return sendMail(
+        config,
+        [{"body": "This is a test email from github-notify-ml.\n", "subtype": "plain"}],
+        from_addr,
+        config.get("DIGEST_SENDER", "github-notify-ml"),
+        [to_addr],
+        "github-notify-ml test email",
+    )
+
 SECRET_KEYS = ("GH_OAUTH_TOKEN", "SMTP_PASSWORD")
 
 def getConfig():
@@ -867,6 +879,10 @@ if __name__ == "__main__":
     )
     if "SCRIPT_NAME" in os.environ:
         print(serveRequest(config, sys.stdin.read()))
+    elif len(sys.argv) > 1 and sys.argv[1] == "test-email":
+        if len(sys.argv) != 3:
+            sys.exit(f"usage: {sys.argv[0]} test-email RECIPIENT")
+        sys.exit(0 if sendTestEmail(config, sys.argv[2]) else 1)
     else:
         period = sys.argv[1] if len(sys.argv) > 1 else None
         sendDigest(config, period)
