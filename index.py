@@ -203,7 +203,7 @@ def andify(l):
     return [{"name": x, "last": i == len(l) - 1} for i, x in enumerate(sorted(l))]
 
 
-def extractDigestInfo(events, eventFilter=None):
+def extractDigestInfo(events, eventFilter=None, token=None):
     def listify(l):
         return {"count": len(l), "list": l}
 
@@ -230,9 +230,18 @@ def extractDigestInfo(events, eventFilter=None):
     newpr = list(filter(isNew, list(filter(isPR, filtered_events))))
     # as of October 2025, the GitHub Events API doesn't include
     # title and html_url in PullRequestEvents
-    # as fallback, calculate html_url manually
+    # fetch the full pull request, and as fallback calculate html_url manually
     for pr in newpr:
-        html_url = pr["payload"]["pull_request"].get("html_url", None)
+        pull = pr["payload"]["pull_request"]
+        if not pull.get("title") and pull.get("url"):
+            headers = {"Authorization": f"token {token}"} if token else {}
+            try:
+                details = httpGet(pull["url"], headers=headers)
+                if details.status_code == 200:
+                    pull.update(details.json())
+            except (requests.RequestException, ValueError) as why:
+                logger.warning("Could not fetch pull request %s: %s", pull["url"], why)
+        html_url = pull.get("html_url", None)
         if not html_url:
             html_url = pr["payload"]["pull_request"]["url"].replace("/api.", "/").replace("/repos/", "/").replace("/pulls/","/pull/")
             pr["payload"]["pull_request"]["html_url"] = html_url
@@ -394,7 +403,7 @@ def sendDigest(config, period="daily"):
                     eventFilters[r] = s.get("eventFilter", None)
             for repo in repos:
                 data = extractDigestInfo(
-                    listGithubEvents(repo, token, until), eventFilters[repo]
+                    listGithubEvents(repo, token, until), eventFilters[repo], token
                 )
                 data["repo"] = getRepoData(repo, token)
                 data["name"] = repo
